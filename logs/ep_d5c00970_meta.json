@@ -1,0 +1,18 @@
+{
+  "episode_id": "ep_d5c00970",
+  "object_name": "aluminum_can",
+  "scenario": "benchmark_stable_grasp",
+  "started_at": "2026-06-04T00:39:21",
+  "csv_path": "C:\\Users\\jdmap\\Desktop\\6DOF-VLA-T\\benchmarks\\..\\logs\\ep_d5c00970.csv",
+  "material": "aluminum",
+  "category": "rigid",
+  "outcome": "success",
+  "row_count": 200,
+  "stopped_at": "2026-06-04T00:39:21",
+  "metrics": {
+    "force_n": 12.0,
+    "slip_events": 0,
+    "force_exceeded": 0,
+    "success": 1
+  }
+}

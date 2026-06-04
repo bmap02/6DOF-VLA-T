@@ -1,0 +1,18 @@
+{
+  "episode_id": "ep_c80a9a53",
+  "object_name": "foam_cube",
+  "scenario": "benchmark_stable_grasp",
+  "started_at": "2026-06-04T00:39:22",
+  "csv_path": "C:\\Users\\jdmap\\Desktop\\6DOF-VLA-T\\benchmarks\\..\\logs\\ep_c80a9a53.csv",
+  "material": "foam_soft",
+  "category": "soft",
+  "outcome": "success",
+  "row_count": 200,
+  "stopped_at": "2026-06-04T00:39:22",
+  "metrics": {
+    "force_n": 2.0,
+    "slip_events": 0,
+    "force_exceeded": 0,
+    "success": 1
+  }
+}

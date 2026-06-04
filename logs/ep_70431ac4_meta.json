@@ -1,0 +1,18 @@
+{
+  "episode_id": "ep_70431ac4",
+  "object_name": "abs_block",
+  "scenario": "benchmark_stable_grasp",
+  "started_at": "2026-06-04T00:39:21",
+  "csv_path": "C:\\Users\\jdmap\\Desktop\\6DOF-VLA-T\\benchmarks\\..\\logs\\ep_70431ac4.csv",
+  "material": "abs_plastic",
+  "category": "rigid",
+  "outcome": "success",
+  "row_count": 200,
+  "stopped_at": "2026-06-04T00:39:22",
+  "metrics": {
+    "force_n": 6.0,
+    "slip_events": 0,
+    "force_exceeded": 0,
+    "success": 1
+  }
+}
