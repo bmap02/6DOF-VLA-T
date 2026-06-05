@@ -205,5 +205,3 @@ config = EpisodeConfig(
 - All benchmark scripts run fully offline with simulated joint data.
 - Episode logs are written to `logs/` and gitignored by default.
 - See `docs/dashboard_roadmap.md` for full project status and planned features.
-
----
