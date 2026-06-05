@@ -524,7 +524,7 @@ UR10e {
     }
     Camera {
       translation 0 0.1 -0.2
-      rotation 1 0 0 1.5708
+      rotation 0 0 0 1.5708
       name "wrist_camera"
       width 640
       height 480
