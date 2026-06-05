@@ -8,6 +8,8 @@ logs/
 
 # IDE
 .idea/
+settings.json
 
-# Webots thumbnails
+# Webots generated files (not source)
 worlds/.*.jpg
+worlds/.*.wbproj

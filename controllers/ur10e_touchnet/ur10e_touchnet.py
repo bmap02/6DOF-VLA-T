@@ -1,14 +1,20 @@
-"""controllers/ur10e_touchnet/ur10e_touchnet.py — UR10e TouchNet controller.
-
-Webots robot controller for the UR10e + Robotiq 3F gripper.
-Handles:
-  - Arm startup pose (stands arm upright)
-  - Joint state monitoring via joint_state_monitor
-  - Gripper open/close commands
-  - Episode runner integration for TouchNet pipeline
-
-Set this as the UR10e robot controller in Webots.
-"""
+# ur10e_touchnet.py - UR10e TouchNet controller
+# NOTE: 'controller' is a Webots-internal module, not pip installable.
+# It resolves automatically when Webots runs this file.
+# To suppress IDE warnings add Webots controller path to your interpreter.
+#
+# Full pick and place demo sequence:
+#   1. Move to ready pose (arm upright)
+#   2. Open gripper
+#   3. Move to approach pose above small table
+#   4. Descend to grasp pose
+#   5. Close gripper on object
+#   6. Lift object
+#   7. Move to place pose above big table
+#   8. Descend to place
+#   9. Open gripper
+#  10. Return to ready pose
+#  11. Repeat
 
 import sys
 import os
@@ -20,8 +26,7 @@ from pipeline.episode_runner import EpisodeConfig, EpisodeRunner, ConstantForceP
 from objects.object_library import get as get_object
 from utils.kinematics_utils import finite_diff_velocity
 
-TIMESTEP    = 32      # ms — match world basicTimeStep
-PRINT_EVERY = 30      # steps between console prints
+TIMESTEP    = 32
 
 # ── UR10e joint motor names ───────────────────────────────────────────────────
 ARM_JOINTS = [
@@ -33,34 +38,55 @@ ARM_JOINTS = [
     "wrist_3_joint",
 ]
 
-# Robotiq 3F gripper motor names
+# Robotiq 3F gripper motors
 GRIPPER_JOINTS = [
     "finger_1_joint_1",
     "finger_2_joint_1",
     "finger_middle_joint_1",
 ]
 
-# ── Startup pose (radians) — arm stands upright, ready to reach down ──────────
-# [shoulder_pan, shoulder_lift, elbow, wrist_1, wrist_2, wrist_3]
-READY_POSE = [0.0, -1.5708, 1.5708, -1.5708, -1.5708, 0.0]
-
-# Gripper states
 GRIPPER_OPEN   = 0.0
-GRIPPER_CLOSED = 0.85   # rad — adjust for object size
+GRIPPER_CLOSED = 0.85
+
+# ── Demo poses (rad) [pan, lift, elbow, w1, w2, w3] ──────────────────────────
+POSES = {
+    "ready":    [ 0.0,    -1.5708,  1.5708, -1.5708, -1.5708,  0.0   ],
+    "approach": [ 1.5708, -1.2000,  1.2000, -1.5708, -1.5708,  0.0   ],
+    "grasp":    [ 1.5708, -1.5000,  1.7000, -1.7000, -1.5708,  0.0   ],
+    "lift":     [ 1.5708, -1.2000,  1.2000, -1.5708, -1.5708,  0.0   ],
+    "place":    [ 0.0,    -1.2000,  1.2000, -1.5708, -1.5708,  0.0   ],
+    "place_dn": [ 0.0,    -1.5000,  1.7000, -1.7000, -1.5708,  0.0   ],
+}
+
+# Steps to hold each pose before transitioning
+HOLD_STEPS = {
+    "ready":    60,
+    "approach": 50,
+    "grasp":    80,
+    "lift":     50,
+    "place":    50,
+    "place_dn": 80,
+}
 
 
 def move_to_pose(motors, targets, speed=0.5):
-    """Command all arm joints to target positions."""
     for motor, target in zip(motors, targets):
         motor.setVelocity(speed)
         motor.setPosition(target)
 
 
 def set_gripper(gripper_motors, position):
-    """Open or close all gripper fingers."""
     for motor in gripper_motors:
         motor.setVelocity(0.5)
         motor.setPosition(position)
+
+
+def joints_reached(sensors, targets, tol=0.05):
+    """Check if all joints are within tolerance of targets."""
+    for s, t in zip(sensors, targets):
+        if s and abs(s.getValue() - t) > tol:
+            return False
+    return True
 
 
 def main():
@@ -87,10 +113,10 @@ def main():
     gripper_motors = []
     for name in GRIPPER_JOINTS:
         motor = robot.getDevice(name)
-        if motor is None:
+        if motor:
+            gripper_motors.append(motor)
+        else:
             print(f"[WARN] Gripper motor '{name}' not found.")
-            continue
-        gripper_motors.append(motor)
 
     # ── Axis monitor ──────────────────────────────────────────────────────────
     axis_monitor = AxisMonitor()
@@ -98,61 +124,78 @@ def main():
     # ── Episode runner ────────────────────────────────────────────────────────
     obj    = get_object("silicone_ball")
     config = EpisodeConfig(
-        scenario    = "stable_grasp",
+        scenario    = "pick_and_place",
         object_name = obj.name,
-        max_steps   = 800,
+        max_steps   = 2000,
         policy      = ConstantForcePolicy(force_n=4.0),
     )
     runner = EpisodeRunner(config=config, robot=robot)
     runner.start(obj)
 
-    # ── Move to ready pose on startup ─────────────────────────────────────────
-    move_to_pose(arm_motors, READY_POSE, speed=0.3)
-    set_gripper(gripper_motors, GRIPPER_OPEN)
-    print("[ur10e_touchnet] Moving to ready pose...")
+    # ── State machine ─────────────────────────────────────────────────────────
+    demo_sequence = [
+        ("ready",    GRIPPER_OPEN),
+        ("approach", GRIPPER_OPEN),
+        ("grasp",    GRIPPER_OPEN),
+        ("grasp",    GRIPPER_CLOSED),   # close on object
+        ("lift",     GRIPPER_CLOSED),
+        ("place",    GRIPPER_CLOSED),
+        ("place_dn", GRIPPER_CLOSED),
+        ("place_dn", GRIPPER_OPEN),     # release
+        ("ready",    GRIPPER_OPEN),
+    ]
 
+    current_stage  = 0
+    hold_counter   = 0
     prev_positions = [None] * len(arm_sensors)
-    step = 0
+    step           = 0
+
+    # Start first pose
+    pose_name, grip = demo_sequence[current_stage]
+    move_to_pose(arm_motors, POSES[pose_name])
+    set_gripper(gripper_motors, grip)
+    print(f"[Demo] Stage 0: {pose_name} | gripper={'open' if grip == GRIPPER_OPEN else 'closed'}")
 
     while robot.step(TIMESTEP) != -1 and step < config.max_steps:
-        sim_time  = robot.getTime()
+        sim_time = robot.getTime()
 
-        # Read joint positions
-        positions = [
-            s.getValue() if s else 0.0
-            for s in arm_sensors
-        ]
-
-        # Finite difference velocities
+        positions  = [s.getValue() if s else 0.0 for s in arm_sensors]
         velocities = [
             finite_diff_velocity(positions[i], prev_positions[i], TIMESTEP * 1e-3)
             for i in range(len(arm_sensors))
         ]
         prev_positions = positions[:]
 
-        # Update axis monitor
         axis_monitor.update_all(positions, velocities)
 
-        # Run episode step
-        recommended_force = runner.step(
-            positions      = positions,
-            velocities     = velocities,
-            gripper_force  = 4.0,
+        # Episode runner step
+        runner.step(
+            positions     = positions,
+            velocities    = velocities,
+            gripper_force = 4.0 if demo_sequence[current_stage][1] == GRIPPER_CLOSED else 0.0,
         )
 
-        # Apply gripper force recommendation
-        # Map force (N) to gripper position (rad): 0N=open, 50N=closed
-        gripper_pos = min(GRIPPER_CLOSED, recommended_force / 50.0 * GRIPPER_CLOSED)
-        set_gripper(gripper_motors, gripper_pos)
+        # ── State machine transition ──────────────────────────────────────────
+        pose_name, grip = demo_sequence[current_stage]
+        if joints_reached(arm_sensors, POSES[pose_name]):
+            hold_counter += 1
+            if hold_counter >= HOLD_STEPS.get(pose_name, 50):
+                hold_counter   = 0
+                current_stage  = (current_stage + 1) % len(demo_sequence)
+                pose_name, grip = demo_sequence[current_stage]
+                move_to_pose(arm_motors, POSES[pose_name])
+                set_gripper(gripper_motors, grip)
+                print(f"[Demo] Stage {current_stage}: {pose_name} | "
+                      f"gripper={'open' if grip == GRIPPER_OPEN else 'closed'}")
 
-        # Print axis stats periodically
-        if step % PRINT_EVERY == 0:
+        # Print axis stats every 30 steps
+        if step % 30 == 0:
             axis_monitor.print_table(sim_time, step)
 
         step += 1
 
     runner.stop(outcome="completed", metrics={"steps": step})
-    print("[ur10e_touchnet] Episode complete.")
+    print("[ur10e_touchnet] Demo complete.")
 
 
 if __name__ == "__main__":

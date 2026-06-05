@@ -1,7 +1,4 @@
-"""sensors/joint_state_monitor.py — per-joint statistics for ABB IRB 4600.
-
-Imported by the Webots controller; also usable standalone for post-processing.
-"""
+"""sensors/joint_state_monitor.py — per-joint statistics for UR10e."""
 
 import math
 from collections import deque
@@ -11,17 +8,23 @@ from typing import Optional
 from utils.kinematics_utils import rolling_mean, rolling_std, clamp
 
 HISTORY_LEN   = 200
-VELOCITY_EPS  = 1e-4   # rad/s — below this = "idle"
+VELOCITY_EPS  = 1e-4
 
-JOINT_NAMES = ["A1 — base", "A2 — shoulder", "A3 — elbow",
-               "A4 — forearm roll", "A5 — wrist pitch", "A6 — wrist roll"]
+JOINT_NAMES = [
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow",
+    "wrist_1",
+    "wrist_2",
+    "wrist_3",
+]
 
 JOINT_LIMITS = [
+    (-6.28318, 6.28318),
+    (-6.28318, 6.28318),
     (-3.14159, 3.14159),
-    (-1.04720, 1.39626),
-    (-3.49066, 1.22173),
-    (-3.49066, 3.49066),
-    (-2.09440, 2.09440),
+    (-6.28318, 6.28318),
+    (-6.28318, 6.28318),
     (-6.28318, 6.28318),
 ]
 
@@ -45,13 +48,10 @@ class AxisStats:
     def update(self, position: float, velocity: float) -> None:
         if self.prev_position is not None:
             self.cum_motion += abs(position - self.prev_position)
-
         self.pos_history.append(position)
         self.vel_history.append(velocity)
-
         if abs(velocity) > self.max_velocity:
             self.max_velocity = abs(velocity)
-
         self.vel_sum       += abs(velocity)
         self.total_samples += 1
         self.prev_position  = position
@@ -117,8 +117,6 @@ class AxisStats:
 
 
 class AxisMonitor:
-    """Manages all 6 joint axes and prints/returns their statistics."""
-
     def __init__(self) -> None:
         self.axes = [
             AxisStats(name=JOINT_NAMES[i], limits=JOINT_LIMITS[i])
@@ -130,29 +128,39 @@ class AxisMonitor:
             ax.update(pos, vel)
 
     def snapshot(self, sim_time: float) -> list[dict]:
-        """Return per-joint dicts for the current timestep."""
         return [ax.to_dict(sim_time) for ax in self.axes]
 
     def print_table(self, sim_time: float, step: int) -> None:
         C = {"b": "\033[1;34m", "g": "\033[32m", "d": "\033[90m",
              "y": "\033[33m",   "r": "\033[0m"}
-        print(f"\n{C['b']}─── Axis monitor{C['r']}  t={sim_time:.3f}s  step={step}")
-        print(f"{'Joint':<22} {'pos':>8} {'vel':>8} {'peak':>7} {'avg':>7} {'cumul':>8}  {'range%':>7}")
-        print("─" * 74)
+        ROWS = 9  # header + column line + divider + 6 joints
+        # After first print, jump cursor back up to overwrite
+        if step > 0:
+            print(f"\033[{ROWS}A", end="")
+        lines = []
+        lines.append(f"{C['b']}--- UR10e Joint Monitor{C['r']}  t={sim_time:.3f}s  step={step:<6}")
+        lines.append(f"{'Joint':<18} {'pos':>8} {'vel':>8} {'peak':>7} {'avg':>7} {'cumul':>8}  {'range%':>7}  status")
+        lines.append("-" * 74)
         for ax in self.axes:
             pos = ax.prev_position or 0.0
             vel = ax.prev_velocity or 0.0
             if ax.near_limit:
-                flag = f"{C['y']}⚠ limit{C['r']}"
+                flag = f"{C['y']}! limit{C['r']}"
             elif ax.is_active:
-                flag = f"{C['g']}● move{C['r']}"
+                flag = f"{C['g']}> move{C['r']}"
             else:
-                flag = f"{C['d']}○ idle{C['r']}"
-            print(
-                f"{ax.name:<22} {pos:>+8.4f} {vel:>+8.4f} "
+                flag = f"{C['d']}o idle{C['r']}"
+            lines.append(
+                f"{ax.name:<18} {pos:>+8.4f} {vel:>+8.4f} "
                 f"{ax.max_velocity:>7.4f} {ax.mean_speed:>7.4f} "
                 f"{ax.cum_motion:>8.4f}  {ax.range_used*100:>6.1f}%  {flag}"
             )
+        # Print all lines, clearing to end of line on each
+        for line in lines:
+            print(line + "\033[K")
+        # flush so Webots console shows update immediately
+        import sys as _sys
+        _sys.stdout.flush()
 
     def reset_all(self) -> None:
         for ax in self.axes:

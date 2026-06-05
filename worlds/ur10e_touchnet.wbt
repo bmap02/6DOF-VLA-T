@@ -517,6 +517,7 @@ StraightStairs {
 UR10e {
   translation -4.84 -0.35 0.742
   rotation 0 0 1 1.5708
+  controller "ur10e_touchnet"
   toolSlot [
     Robotiq3fGripper {
     }
