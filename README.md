@@ -207,6 +207,3 @@ config = EpisodeConfig(
 - See `docs/dashboard_roadmap.md` for full project status and planned features.
 
 ---
-
-## Repository
-[github.com/bmap02/6DOF-VLA-T](https://github.com/bmap02/6DOF-VLA-T)
