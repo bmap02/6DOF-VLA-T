@@ -82,7 +82,6 @@ def set_gripper(gripper_motors, position):
 
 
 def joints_reached(sensors, targets, tol=0.05):
-    """Check if all joints are within tolerance of targets."""
     for s, t in zip(sensors, targets):
         if s and abs(s.getValue() - t) > tol:
             return False
@@ -118,6 +117,14 @@ def main():
         else:
             print(f"[WARN] Gripper motor '{name}' not found.")
 
+    # ── Wrist camera ──────────────────────────────────────────────────────────
+    camera = robot.getDevice("wrist_camera")
+    if camera:
+        camera.enable(TIMESTEP)
+        print("[ur10e_touchnet] Wrist camera enabled.")
+    else:
+        print("[WARN] wrist_camera not found.")
+
     # ── Axis monitor ──────────────────────────────────────────────────────────
     axis_monitor = AxisMonitor()
 
@@ -137,11 +144,11 @@ def main():
         ("ready",    GRIPPER_OPEN),
         ("approach", GRIPPER_OPEN),
         ("grasp",    GRIPPER_OPEN),
-        ("grasp",    GRIPPER_CLOSED),   # close on object
+        ("grasp",    GRIPPER_CLOSED),
         ("lift",     GRIPPER_CLOSED),
         ("place",    GRIPPER_CLOSED),
         ("place_dn", GRIPPER_CLOSED),
-        ("place_dn", GRIPPER_OPEN),     # release
+        ("place_dn", GRIPPER_OPEN),
         ("ready",    GRIPPER_OPEN),
     ]
 

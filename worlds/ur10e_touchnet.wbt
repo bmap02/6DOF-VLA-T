@@ -31,8 +31,8 @@ WorldInfo {
 }
 Viewpoint {
   fieldOfView 0.85
-  orientation -0.2921202945572828 0.22962011835543666 0.9284074185152775 1.6421296275635653
-  position -5.433783135344518 -4.118568568155629 3.0079173801068446
+  orientation 0.26807988781359293 -0.1786821025169573 -0.9466815092680172 4.526310865125049
+  position -5.114074577078783 -3.9089005392389744 2.56280988281834
   follow "robot:IRB 4600/40:solid:solid:solid:solid:solid:solid:pen"
   followType "Pan and Tilt Shot"
 }
@@ -75,7 +75,7 @@ DEF TABLE_WITH_PAPER_SHEET Pose {
   translation -5.8 -1.1 0
   children [
     DEF PAPER Pose {
-      translation 0 0 0.741
+      translation 0.18 0.03 0.741
       children [
         Shape {
           appearance Appearance {
@@ -94,6 +94,7 @@ DEF TABLE_WITH_PAPER_SHEET Pose {
       ]
     }
     Table {
+      translation 0.182209 0.0290831 0
       name "table with paper"
       size 1 1 0.74
       feetPadding 0.05
@@ -520,6 +521,31 @@ UR10e {
   controller "ur10e_touchnet"
   toolSlot [
     Robotiq3fGripper {
+    }
+    Camera {
+      translation 0 0.1 -0.2
+      rotation 1 0 0 1.5708
+      name "wrist_camera"
+      width 640
+      height 480
+      near 0.05
+      far 5
+    }
+    Solid {
+      translation 0 0.1 -0.2
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.1 0.1 0.1
+            roughness 0.5
+            metalness 0.8
+          }
+          geometry Box {
+            size 0.04 0.04 0.03
+          }
+        }
+      ]
+      name "camera_body"
     }
   ]
 }
