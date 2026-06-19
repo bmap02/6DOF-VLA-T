@@ -21,10 +21,13 @@ A **VLA (Vision-Language-Action) model** will be integrated in a future phase to
 6DOF-VLA-T/
 │
 ├── controllers/
-│   └── ur10e_touchnet/
-│       ├── ur10e_touchnet.py       # Webots robot controller (entry point)
-│       ├── ur10e_touchnet.html     # (reserved) future browser dashboard
-│       └── runtime.ini             # Webots Python path config
+│   ├── ur10e_touchnet/
+│   │   ├── ur10e_touchnet.py            # Main Webots robot controller (entry point)
+│   │   └── runtime.ini                  # Webots Python path config
+│   │
+│   └── overhead_camera_detection/
+│       ├── overhead_camera_detection.py # Fixed overhead camera: color detection + world coords
+│       └── runtime.ini
 │
 ├── sensors/
 │   ├── joint_state_monitor.py      # Per-joint statistics: pos, vel, peak, avg, cumul, range
@@ -52,7 +55,7 @@ A **VLA (Vision-Language-Action) model** will be integrated in a future phase to
 │   └── kinematics_utils.py         # Shared math helpers: clamp, finite diff, rolling stats
 │
 ├── worlds/
-│   └── ur10e_touchnet.wbt          # Webots world file: UR10e + Robotiq 3F + scene
+│   └── ur10e_touchnet.wbt          # Webots world: UR10e + Robotiq 3F + overhead camera + scene
 │
 ├── logs/                           # Generated episode CSVs and metadata (gitignored)
 ├── docs/
@@ -140,6 +143,22 @@ python controllers\ur10e_touchnet\ur10e_touchnet.py
 
 ---
 
+## Vision-Guided Pick and Place Demo
+
+`ur10e_touchnet.py` runs a full closed-loop demo combining vision, distance sensing, and the physics contact model:
+
+1. **SCAN** — arm idles at ready pose, waits for the overhead camera to detect a colored object
+2. **AIM** — arm rotates toward the object using world coordinates computed from the overhead camera (color blob detection → pixel-to-world projection → `atan2` pan angle)
+3. **DESCEND** — arm lowers gradually while reading a wrist-mounted `RangeFinder`; stops once the object is within grasp range
+4. **GRASP** — gripper closes incrementally; success is confirmed using **both** real finger position sensor feedback and the Hertz contact model's `grip_margin`
+5. **LIFT → CARRY → PLACE_DESCEND → RELEASE → RETURN** — object is moved to a second table and the arm loops back to scan for the next object
+
+Throughout `AIM` and `DESCEND`, the wrist is kept level (pointing straight down) by solving `wrist_1 = target_pitch - shoulder_lift - elbow` using **live sensor readings** each step — this decouples position control from orientation control so the gripper doesn't drift as the arm reaches and lowers.
+
+The overhead camera runs as a second, independent Webots controller (`overhead_camera_detection.py`) and shares detected object world-coordinates with the main controller via a small JSON file in `logs/`.
+
+---
+
 ## VLA Integration
 
 The VLA model slot is defined in `pipeline/episode_runner.py`:
@@ -204,4 +223,26 @@ config = EpisodeConfig(
   to your IDE interpreter paths to suppress import warnings.
 - All benchmark scripts run fully offline with simulated joint data.
 - Episode logs are written to `logs/` and gitignored by default.
+- The vision-guided demo requires **both** controllers running simultaneously: `ur10e_touchnet` (arm) and `overhead_camera_detection` (fixed overhead camera, defined as a separate `Robot` node in the world file).
+- `logs/overhead_detections.json` is generated automatically and used to pass detected object coordinates between the two controllers — gitignored.
 - See `docs/dashboard_roadmap.md` for full project status and planned features.
+
+---
+
+## References
+
+Material properties, contact physics, and control concepts in this project draw on the following sources. All implementation code is original to this repository; references below informed approach and were used to validate against standard formulations.
+
+| Topic | Source |
+|-------|--------|
+| Hertz contact model | K. L. Johnson, *Contact Mechanics*, Cambridge University Press, 1985 — used in `physics/contact_model.py` for indentation depth, contact radius, and peak pressure calculations |
+| KKT complementarity / slip condition | D. E. Stewart & J. C. Trinkle, "An implicit time-stepping scheme for rigid body dynamics with inelastic collisions and Coulomb friction," *International Journal for Numerical Methods in Engineering*, 1996 — used in `physics/contact_model.py` for the Coulomb friction cone check and kinetic slip clamping |
+| Complementarity contact framework (reference implementation) | [PyRoboCOP](https://github.com/merlresearch/PyRoboCOP) — Raghunathan, Jha, Romeres, MERL Research, 2022. Open-source Python package for robotic control with complementarity-constrained contact models; used as a conceptual reference for how complementarity constraints are structured in code, not directly imported |
+| Inverse kinematics — decoupled position/orientation solving | [Inverse-Kinematics-6-DOF-Python-With-Visualizer](https://github.com/zahid58/Inverse-Kinematics-6-DOF-Python-With-Visualizer) — Md. Zahidul Islam (based on [mithi/arm-ik](https://github.com/mithi/arm-ik)). Demonstrates the technique of solving wrist position and end-effector orientation as separate steps for a 6DOF arm. The concept (not the code) informed `compute_level_wrist1()` in `ur10e_touchnet.py`, which solves the wrist joint angle needed to keep the gripper level using live sensor feedback |
+| UR10e arm model and IK | Webots R2025a — Universal Robots UR10e proto and built-in IK solver, [cyberbotics.com](https://cyberbotics.com) |
+| Material engineering data | Standard engineering references (Young's modulus, Poisson's ratio, friction coefficients) for the 21 materials in `physics/material_properties.py` |
+
+---
+
+## Repository
+[github.com/bmap02/6DOF-VLA-T](https://github.com/bmap02/6DOF-VLA-T)

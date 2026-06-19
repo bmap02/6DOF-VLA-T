@@ -31,8 +31,8 @@ WorldInfo {
 }
 Viewpoint {
   fieldOfView 0.85
-  orientation 0.26807988781359293 -0.1786821025169573 -0.9466815092680172 4.526310865125049
-  position -5.114074577078783 -3.9089005392389744 2.56280988281834
+  orientation 0.2433527518498101 -0.8333379781054486 -0.4963136633362493 5.6343883181828005
+  position -6.685237010075535 0.2648655165837747 1.8447241433051997
   follow "robot:IRB 4600/40:solid:solid:solid:solid:solid:solid:pen"
   followType "Pan and Tilt Shot"
 }
@@ -58,6 +58,65 @@ Floor {
   appearance ThreadMetalPlate {
   }
 }
+Solid {
+  translation -5.92428 -0.177016 0.81
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 1 0
+      }
+      geometry Box {
+        size 0.1 0.1 0.1
+      }
+    }
+  ]
+  name "Box"
+  boundingObject Box {
+    size 0.1 0.1 0.1
+  }
+  physics Physics {
+  }
+}
+Solid {
+  translation -5.80198 0.0701728 0.81
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.333333 0.666667 1
+      }
+      geometry Cylinder {
+        height 0.1
+        radius 0.05
+      }
+    }
+  ]
+  name "Cylinder"
+  boundingObject Cylinder {
+    height 0.1
+    radius 0.05
+  }
+  physics Physics {
+  }
+}
+Solid {
+  translation -5.63 -0.11 0.81
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+      }
+      geometry Sphere {
+        radius 0.05
+      }
+    }
+  ]
+  name "Sphere"
+  boundingObject Sphere {
+    radius 0.05
+  }
+  physics Physics {
+  }
+}
 Table {
   translation -4.84 1 0
   size 3 3 0.74
@@ -74,27 +133,8 @@ Table {
 DEF TABLE_WITH_PAPER_SHEET Pose {
   translation -5.8 -1.1 0
   children [
-    DEF PAPER Pose {
-      translation 0.18 0.03 0.741
-      children [
-        Shape {
-          appearance Appearance {
-            material Material {
-            }
-            texture ImageTexture {
-              url [
-                "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/default/worlds/textures/plastic.jpg"
-              ]
-            }
-          }
-          geometry Plane {
-            size 0.8 0.8
-          }
-        }
-      ]
-    }
     Table {
-      translation 0.182209 0.0290831 0
+      translation 0.182209 0.109083 0
       name "table with paper"
       size 1 1 0.74
       feetPadding 0.05
@@ -516,15 +556,18 @@ StraightStairs {
   ]
 }
 UR10e {
-  translation -4.84 -0.35 0.742
+  translation -4.84 -0.35 0.7420000000000001
   rotation 0 0 1 1.5708
   controller "ur10e_touchnet"
   toolSlot [
+    RangeFinder {
+      translation 0 0.09 0
+    }
     Robotiq3fGripper {
     }
     Camera {
-      translation 0 0.1 -0.2
-      rotation 0 0 0 1.5708
+      translation 0 0.05 0.01
+      rotation 0 0 1 1.5708
       name "wrist_camera"
       width 640
       height 480
@@ -532,11 +575,11 @@ UR10e {
       far 5
     }
     Solid {
-      translation 0 0.1 -0.2
+      translation 0 0.04 0.01
       children [
         Shape {
           appearance PBRAppearance {
-            baseColor 0.1 0.1 0.1
+            baseColor 0 1 0
             roughness 0.5
             metalness 0.8
           }
@@ -548,4 +591,19 @@ UR10e {
       name "camera_body"
     }
   ]
+}
+Robot {
+  translation -5.8 -0.07 2
+  rotation 0 1 0 1.5708
+  children [
+    Camera {
+      name "overhead_camera"
+      width 640
+      height 480
+      near 0.1
+      far 10
+    }
+  ]
+  name "overhead_camera_detection"
+  controller "overhead_camera_detection"
 }
