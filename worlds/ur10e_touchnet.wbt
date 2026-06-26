@@ -31,8 +31,8 @@ WorldInfo {
 }
 Viewpoint {
   fieldOfView 0.85
-  orientation 0.2433527518498101 -0.8333379781054486 -0.4963136633362493 5.6343883181828005
-  position -6.685237010075535 0.2648655165837747 1.8447241433051997
+  orientation 0.267941230924727 -0.7380320054422056 -0.6192868928965786 5.945056815921517
+  position -9.51120226465123 -0.2198107108536801 1.9668366057972182
   follow "robot:IRB 4600/40:solid:solid:solid:solid:solid:solid:pen"
   followType "Pan and Tilt Shot"
 }
@@ -561,7 +561,7 @@ UR10e {
   controller "ur10e_touchnet"
   toolSlot [
     RangeFinder {
-      translation 0 0.09 0
+      translation 0 0.098 0
     }
     Robotiq3fGripper {
     }
