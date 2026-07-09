@@ -26,8 +26,11 @@ A **VLA (Vision-Language-Action) model** will be integrated in a future phase to
 │   │   └── runtime.ini                  # Webots Python path config
 │   │
 │   └── overhead_camera_detection/
-│       ├── overhead_camera_detection.py # Fixed overhead camera: color detection + world coords
-│       └── runtime.ini
+│       └── overhead_camera_detection.py # Fixed overhead camera: Webots Camera Recognition + world coords
+│
+├── urdf/
+│   ├── ur10e.urdf                  # UR10e arm model, loaded into Drake for kinematics
+│   └── robotiq_3f_gripper.urdf     # Robotiq 3F gripper model, loaded into Drake for kinematics
 │
 ├── sensors/
 │   ├── joint_state_monitor.py      # Per-joint statistics: pos, vel, peak, avg, cumul, range
@@ -46,10 +49,8 @@ A **VLA (Vision-Language-Action) model** will be integrated in a future phase to
 │   └── log_export.py               # CPIM/TouchNet format CSV + JSON trajectory logger
 │
 ├── benchmarks/
-│   ├── benchmark_stable_grasp.py   # Benchmark: stable grasping (29/30 passing)
-│   ├── benchmark_slip_detection.py # Benchmark: slip detection (TODO)
-│   ├── benchmark_force_overshoot.py# Benchmark: fragile object force overshoot (TODO)
-│   └── benchmark_generalization.py # Benchmark: unseen object generalization (TODO)
+│   └── benchmark_stable_grasp.py   # Benchmark: stable grasping (29/30 passing)
+│   # slip_detection / force_overshoot / generalization benchmarks are planned, not yet implemented
 │
 ├── utils/
 │   └── kinematics_utils.py         # Shared math helpers: clamp, finite diff, rolling stats
@@ -58,8 +59,6 @@ A **VLA (Vision-Language-Action) model** will be integrated in a future phase to
 │   └── ur10e_touchnet.wbt          # Webots world: UR10e + Robotiq 3F + overhead camera + scene
 │
 ├── logs/                           # Generated episode CSVs and metadata (gitignored)
-├── docs/
-│   └── dashboard_roadmap.md        # Full project roadmap with completion status
 │
 ├── .gitignore
 └── README.md
@@ -73,11 +72,15 @@ A **VLA (Vision-Language-Action) model** will be integrated in a future phase to
 
 ```powershell
 # Install Python dependencies
-pip install numpy
+pip install numpy drake
 
 # Install Webots R2025a
 # https://cyberbotics.com/
 ```
+
+`drake` (pydrake) provides the `MultibodyPlant`/`InverseKinematics` engine that
+`ur10e_touchnet.py` uses to parse the URDF models in `urdf/` and solve full
+6-DOF inverse kinematics each control step.
 
 ### Run Benchmarks (no Webots needed)
 
@@ -95,7 +98,7 @@ python benchmarks\benchmark_stable_grasp.py
 
 1. Open Webots → `File → Open World` → `worlds\ur10e_touchnet.wbt`
 2. Ensure the `UR10e` node has `controller "ur10e_touchnet"` set
-3. Hit play — the arm moves to ready pose and begins the pick and place demo
+3. Hit play — the arm moves to ready pose and begins the pick and lift demo
 
 ### Run Controller Externally (PowerShell)
 
@@ -143,19 +146,21 @@ python controllers\ur10e_touchnet\ur10e_touchnet.py
 
 ---
 
-## Vision-Guided Pick and Place Demo
+## Vision-Guided Pick and Lift Demo
 
-`ur10e_touchnet.py` runs a full closed-loop demo combining vision, distance sensing, and the physics contact model:
+`ur10e_touchnet.py` runs a full closed-loop demo combining vision, distance sensing, and Drake-based inverse kinematics:
 
-1. **SCAN** — arm idles at ready pose, waits for the overhead camera to detect a colored object
-2. **AIM** — arm rotates toward the object using world coordinates computed from the overhead camera (color blob detection → pixel-to-world projection → `atan2` pan angle)
-3. **DESCEND** — arm lowers gradually while reading a wrist-mounted `RangeFinder`; stops once the object is within grasp range
-4. **GRASP** — gripper closes incrementally; success is confirmed using **both** real finger position sensor feedback and the Hertz contact model's `grip_margin`
-5. **LIFT → CARRY → PLACE_DESCEND → RELEASE → RETURN** — object is moved to a second table and the arm loops back to scan for the next object
+1. **INITIALIZE** — arm drives to a fixed ready pose
+2. **TRANSIT_UP** — arm rises straight up to a safe transit height above the workspace, then snapshots the overhead camera's current object detection (world x/y + a stable Recognition `id`) before the arm's own body can enter the overhead camera's view and be mistaken for an object
+3. **TRANSIT_OVER → MOVE_TO_REGION** — arm moves horizontally to the locked region, then descends to an approach hover height directly above it
+4. **CAMERA_TRACK_ALIGN** — the wrist camera looks up the same tracked object `id` via Webots Camera Recognition and the arm servos its XY position until it's centered directly above the object; the object's recognized world Z is captured as the grasp depth target
+5. **VERTICAL_DESCEND** — arm lowers gradually, primarily targeting the object's own recognized height, with a wrist-mounted `RangeFinder` reading kept as a secondary/earlier trigger
+6. **CLOSE_GRIPPER** — gripper closes onto the object
+7. **LIFT** — arm rises back to transit height with the object grasped, then returns to **IDLE**
 
-Throughout `AIM` and `DESCEND`, the wrist is kept level (pointing straight down) by solving `wrist_1 = target_pitch - shoulder_lift - elbow` using **live sensor readings** each step — this decouples position control from orientation control so the gripper doesn't drift as the arm reaches and lowers.
+Both the overhead camera and the wrist camera use [Webots Camera Recognition](https://cyberbotics.com/doc/reference/recognition) rather than color-blob pixel scanning — this gives ground-truth object positions and a stable per-object id, so "the object to pick" is whatever is physically inside the `ObjectBoundingBox` region marker (defined in the world file) rather than a hardcoded color or position. Inverse kinematics is solved with Drake's `InverseKinematics` optimizer over the UR10e + Robotiq 3F gripper URDF models (`urdf/`), jointly constraining palm position and orientation each step rather than a decoupled per-joint solve.
 
-The overhead camera runs as a second, independent Webots controller (`overhead_camera_detection.py`) and shares detected object world-coordinates with the main controller via a small JSON file in `logs/`.
+The overhead camera runs as a second, independent Webots controller (`overhead_camera_detection.py`) and shares its detected object's world-coordinates and Recognition `id` with the main controller via a small JSON file in `logs/`.
 
 ---
 
@@ -224,8 +229,7 @@ config = EpisodeConfig(
 - All benchmark scripts run fully offline with simulated joint data.
 - Episode logs are written to `logs/` and gitignored by default.
 - The vision-guided demo requires **both** controllers running simultaneously: `ur10e_touchnet` (arm) and `overhead_camera_detection` (fixed overhead camera, defined as a separate `Robot` node in the world file).
-- `logs/overhead_detections.json` is generated automatically and used to pass detected object coordinates between the two controllers — gitignored.
-- See `docs/dashboard_roadmap.md` for full project status and planned features.
+- `logs/overhead_detections.json` is generated automatically and used to pass the tracked object's world coordinates and Recognition `id` between the two controllers — gitignored.
 
 ---
 
@@ -238,8 +242,10 @@ Material properties, contact physics, and control concepts in this project draw 
 | Hertz contact model | K. L. Johnson, *Contact Mechanics*, Cambridge University Press, 1985 — used in `physics/contact_model.py` for indentation depth, contact radius, and peak pressure calculations |
 | KKT complementarity / slip condition | D. E. Stewart & J. C. Trinkle, "An implicit time-stepping scheme for rigid body dynamics with inelastic collisions and Coulomb friction," *International Journal for Numerical Methods in Engineering*, 1996 — used in `physics/contact_model.py` for the Coulomb friction cone check and kinetic slip clamping |
 | Complementarity contact framework (reference implementation) | [PyRoboCOP](https://github.com/merlresearch/PyRoboCOP) — Raghunathan, Jha, Romeres, MERL Research, 2022. Open-source Python package for robotic control with complementarity-constrained contact models; used as a conceptual reference for how complementarity constraints are structured in code, not directly imported |
-| Inverse kinematics — decoupled position/orientation solving | [Inverse-Kinematics-6-DOF-Python-With-Visualizer](https://github.com/zahid58/Inverse-Kinematics-6-DOF-Python-With-Visualizer) — Md. Zahidul Islam (based on [mithi/arm-ik](https://github.com/mithi/arm-ik)). Demonstrates the technique of solving wrist position and end-effector orientation as separate steps for a 6DOF arm. The concept (not the code) informed `compute_level_wrist1()` in `ur10e_touchnet.py`, which solves the wrist joint angle needed to keep the gripper level using live sensor feedback |
-| UR10e arm model and IK | Webots R2025a — Universal Robots UR10e proto and built-in IK solver, [cyberbotics.com](https://cyberbotics.com) |
+| Multibody dynamics & numerical inverse kinematics | Russ Tedrake, [*Underactuated Robotics*](https://underactuated.csail.mit.edu/index.html), MIT — course notes underpinning the Drake `MultibodyPlant` formulation and optimization-based IK used throughout `compute_ik()` in `ur10e_touchnet.py` |
+| Manipulation, grasping, and perception-driven pick pipelines | Russ Tedrake, [*Robotic Manipulation*](https://manipulation.mit.edu/robot.html), MIT — informed the region-locked, recognition-driven pick sequence (`TRANSIT_UP` → `CAMERA_TRACK_ALIGN` → `VERTICAL_DESCEND`) and the use of Drake's `InverseKinematics` solver over a URDF-parsed arm + gripper model |
+| Object detection (world coordinates + stable identity) | [Webots Camera Recognition](https://cyberbotics.com/doc/reference/recognition), R2025a — ground-truth object position and per-object `id`, used in both `overhead_camera_detection.py` and `ur10e_touchnet.py` in place of color-blob pixel scanning |
+| UR10e arm model | Webots R2025a — Universal Robots UR10e proto, [cyberbotics.com](https://cyberbotics.com) |
 | Material engineering data | Standard engineering references (Young's modulus, Poisson's ratio, friction coefficients) for the 21 materials in `physics/material_properties.py` |
 
 ---
