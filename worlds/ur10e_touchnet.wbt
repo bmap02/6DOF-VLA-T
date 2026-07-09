@@ -31,8 +31,8 @@ WorldInfo {
 }
 Viewpoint {
   fieldOfView 0.85
-  orientation 0.267941230924727 -0.7380320054422056 -0.6192868928965786 5.945056815921517
-  position -9.51120226465123 -0.2198107108536801 1.9668366057972182
+  orientation 0.04597203250983913 -0.9578147572165383 0.2836855003082424 5.739267828438268
+  position -9.07711449000447 0.8403705498778127 2.6488363092015397
   follow "robot:IRB 4600/40:solid:solid:solid:solid:solid:solid:pen"
   followType "Pan and Tilt Shot"
 }
@@ -71,11 +71,15 @@ Solid {
     }
   ]
   name "Box"
+  model "Box"
   boundingObject Box {
     size 0.1 0.1 0.1
   }
   physics Physics {
   }
+  recognitionColors [
+    1 1 0
+  ]
 }
 Solid {
   translation -5.80198 0.0701728 0.81
@@ -91,12 +95,16 @@ Solid {
     }
   ]
   name "Cylinder"
+  model "Cylinder"
   boundingObject Cylinder {
     height 0.1
     radius 0.05
   }
   physics Physics {
   }
+  recognitionColors [
+    0.333333 0.666667 1
+  ]
 }
 Solid {
   translation -5.63 -0.11 0.81
@@ -111,11 +119,15 @@ Solid {
     }
   ]
   name "Sphere"
+  model "Sphere"
   boundingObject Sphere {
     radius 0.05
   }
   physics Physics {
   }
+  recognitionColors [
+    1 0 0
+  ]
 }
 Table {
   translation -4.84 1 0
@@ -561,34 +573,22 @@ UR10e {
   controller "ur10e_touchnet"
   toolSlot [
     RangeFinder {
-      translation 0 0.098 0
+      translation 2.57124e-07 0.098 0
+      rotation 0.70710528118436 0.707108281185553 3.3905113482557537e-09 3.14159
     }
     Robotiq3fGripper {
     }
     Camera {
-      translation 0 0.05 0.01
-      rotation 0 0 1 1.5708
+      translation -1.93319e-07 0.1 -1.01284e-07
+      rotation 0.70710528118436 0.707108281185553 3.3905113482557537e-09 3.14159
       name "wrist_camera"
+      fieldOfView 0.75
       width 640
       height 480
       near 0.05
       far 5
-    }
-    Solid {
-      translation 0 0.04 0.01
-      children [
-        Shape {
-          appearance PBRAppearance {
-            baseColor 0 1 0
-            roughness 0.5
-            metalness 0.8
-          }
-          geometry Box {
-            size 0.04 0.04 0.03
-          }
-        }
-      ]
-      name "camera_body"
+      recognition Recognition {
+      }
     }
   ]
 }
@@ -602,8 +602,14 @@ Robot {
       height 480
       near 0.1
       far 10
+      recognition Recognition {
+      }
     }
   ]
   name "overhead_camera_detection"
   controller "overhead_camera_detection"
+}
+Solid {
+  translation -5.79 -0.05 0.99
+  name "ObjectBoundingBox"
 }
