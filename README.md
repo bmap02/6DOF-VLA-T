@@ -18,50 +18,8 @@ A **VLA (Vision-Language-Action) model** will be integrated in a future phase to
 ## Project Structure
 
 ```
-6DOF-VLA-T/
-│
-├── controllers/
-│   ├── ur10e_touchnet/
-│   │   ├── ur10e_touchnet.py            # Main Webots robot controller (entry point)
-│   │   └── runtime.ini                  # Webots Python path config
-│   │
-│   └── overhead_camera_detection/
-│       └── overhead_camera_detection.py # Fixed overhead camera: Webots Camera Recognition + world coords
-│
-├── urdf/
-│   ├── ur10e.urdf                  # UR10e arm model, loaded into Drake for kinematics
-│   └── robotiq_3f_gripper.urdf     # Robotiq 3F gripper model, loaded into Drake for kinematics
-│
-├── sensors/
-│   ├── joint_state_monitor.py      # Per-joint statistics: pos, vel, peak, avg, cumul, range
-│   ├── tactile_array_sensor.py     # Simulated GelSight/DIGIT 16x16 tactile array
-│   └── ft_sensor_interface.py      # Simulated 6-axis force/torque sensor with noise + drift
-│
-├── physics/
-│   ├── contact_model.py            # Hertz contact model + KKT complementarity slip condition
-│   └── material_properties.py      # Material registry: E, nu, mu_s, mu_k for 21 materials
-│
-├── objects/
-│   └── object_library.py           # 22 graspable objects across 5 material categories
-│
-├── pipeline/
-│   ├── episode_runner.py           # Episode lifecycle + VLA interface stub + state machine
-│   └── log_export.py               # CPIM/TouchNet format CSV + JSON trajectory logger
-│
-├── benchmarks/
-│   └── benchmark_stable_grasp.py   # Benchmark: stable grasping (29/30 passing)
-│   # slip_detection / force_overshoot / generalization benchmarks are planned, not yet implemented
-│
-├── utils/
-│   └── kinematics_utils.py         # Shared math helpers: clamp, finite diff, rolling stats
-│
-├── worlds/
-│   └── ur10e_touchnet.wbt          # Webots world: UR10e + Robotiq 3F + overhead camera + scene
-│
-├── logs/                           # Generated episode CSVs and metadata (gitignored)
-│
-├── .gitignore
-└── README.md
+<img width="4959" height="5732" alt="diagram (1)" src="https://github.com/user-attachments/assets/93ad624e-e9a0-4888-be15-6739f5e2c9d4" />
+
 ```
 
 ---
