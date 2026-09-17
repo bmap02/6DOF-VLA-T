@@ -17,10 +17,9 @@ A **VLA (Vision-Language-Action) model** will be integrated in a future phase to
 
 ## Project Structure
 
-```
 <img width="4959" height="5732" alt="diagram (1)" src="https://github.com/user-attachments/assets/93ad624e-e9a0-4888-be15-6739f5e2c9d4" />
 
-```
+
 
 ---
 
